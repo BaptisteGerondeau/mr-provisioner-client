@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
+import argparse
+
 from library.PreseedControl import PreseedControl
+from library.StateControl import StateControl
+from library.ImageControl import ImageControl
 from helper.ClientLogger import ClientLogger
 
 from library.common import *
-import argparse
-
-from library.ImageControl import ImageControl
 
 class Client(object):
     def __init__(self, parser, args):
@@ -28,6 +29,10 @@ class Client(object):
             self.preseed(self.args.action, self.args.preseed_name, self.args.preseed_path,
                          self.args.description, self.args.type, self.args.public,
                          self.args.knowngood)
+        elif self.args.subcommand == 'state':
+            self.machine_control(self.args.machine, self.args.action, self.args.preseed_name,
+                                 self.args.initrd_desc, self.args.kernel_desc, self.args.kernel_opts,
+                                 self.args.arch, self.args.subarch)
         else:
             self.parser.print_help()
 
@@ -69,6 +74,39 @@ class Client(object):
             self.log.fatal(err)
             exit(1)
 
+    def machine_control(self, machine_name, action, preseed_name, initrd_desc, kernel_desc,
+                             kernel_opts, arch, subarch):
+        try:
+            state = StateControl(self.urlhandler, machine_name)
+
+            if action == 'getparams':
+                machine_state = state.get_state()
+                print(self.__print_machine_state(machine_state))
+            else:
+                rc = state.set_state(arch, subarch, initrd_desc, kernel_desc,
+                                     kernel_opts, preseed_name)
+                self.log.debug(rc)
+            if action == 'provision':
+                rc = state.provision()
+                self.log.debug(rc)
+
+        except Exception as err:
+            self.log.fatal(err)
+            exit(1)
+
+    def __print_machine_state(self, machine_state):
+        printable_state = "id: " + str(machine_state['id']) + '\n'
+        printable_state += "name: " + machine_state['name'] + '\n'
+        printable_state += "hostname: " + machine_state['hostname'] + '\n'
+        printable_state += "arch: " + machine_state['arch'] + '\n'
+        printable_state += "subarch: " + machine_state['subarch'] + '\n'
+        printable_state += "kernel_id: " + str( machine_state['kernel_id']) + '\n'
+        printable_state += "kernel_opts: " + machine_state['kernel_opts'] + '\n'
+        printable_state += "initrd_id: " + str(machine_state['initrd_id']) + '\n'
+        printable_state += "preseed_id: " + str(machine_state['preseed_id']) + '\n'
+        printable_state += "netboot_enabled: " + str(machine_state['netboot_enabled']) + '\n'
+
+        return printable_state
 
 if __name__ == '__main__':
     """This is the point of entry of our application, not much logic here"""
@@ -116,5 +154,24 @@ if __name__ == '__main__':
                                 help='Switches known good flag')
     parser_preseed.add_argument('--public', action='store_true', default=False,
                                 help='Switches public flag')
+
+    parser_machine = subparsers.add_parser('state')
+    parser_machine.add_argument('--action', type=str, default='', required=True,
+                                choices=['provision', 'setparams', 'getparams'],
+                                help='provision, setparams')
+    parser_machine.add_argument('--machine', type=str, default='',
+                                required=True, help='name of the machine')
+    parser_machine.add_argument('--preseed-name', type=str, default='',
+                                required=False, help='name of the preseed to use')
+    parser_machine.add_argument('--initrd-desc', type=str, default='',
+                                required=False, help='description of the initrd to use')
+    parser_machine.add_argument('--kernel-desc', type=str, default='',
+                                required=False, help='description of the kernel to use')
+    parser_machine.add_argument('--kernel-opts', type=str, default='',
+                                help='kernel options to use')
+    parser_machine.add_argument('--arch', type=str, default='', required=True,
+                                help='architecture of the machine as in MrP')
+    parser_machine.add_argument('--subarch', type=str, default='',
+                                required=False, help='subarchitecture of the machine as in MrP')
 
     Client(parser, parser.parse_args()).parse()
