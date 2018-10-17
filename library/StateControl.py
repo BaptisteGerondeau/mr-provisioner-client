@@ -11,26 +11,25 @@ class StateControl(object):
     def __init__(self, urlhandler, machine_name):
         self.urlhandler = urlhandler
         self.machine_id = get_machine_id(self.urlhandler, machine_name)
-        self.machine_state = None
 
-    def provision(self):
+    def provision(self, arch, subarch, initrd_desc, kernel_desc,
+                  kernel_opts="", preseed_name=None):
         """ enables netboot on the machine and pxe boots it """
+        self.set_provisioning_state(arch, subarch, initrd_desc, kernel_desc,
+                                    kernel_opts, preseed_name, True)
+
         url = "/api/v1/machine/{}/state".format(self.machine_id)
         data = json.dumps({'state': 'provision'})
 
         return self.urlhandler.post(url, data)
 
-    def __update_state(self):
-        url = "/api/v1/machine/{}".format(self.machine_id)
-        self.state = self.urlhandler.get(url)
-
-    def get_state(self):
+    def get_provisioning_state(self):
         """ Get parameters on machine specified by machine_id """
-        self.__update_state()
-        return self.state
+        url = "/api/v1/machine/{}".format(self.machine_id)
+        return self.urlhandler.get(url)
 
-    def set_state(self, arch, subarch, initrd_desc, kernel_desc,
-                          kernel_opts="", preseed_name=None):
+    def set_provisioning_state(self, arch, subarch, initrd_desc, kernel_desc,
+                          kernel_opts="", preseed_name=None, netboot=False):
         """ Set parameters on machine specified by machine_id """
         if arch == '' or subarch == '' or initrd_desc == '' or kernel_desc == '':
             raise ClientError("Missing arguments for setting machine's state")
@@ -46,7 +45,7 @@ class StateControl(object):
             kernel_id = image_controller.get_image_id(kernel_desc,
                                                     "Kernel", arch)
         else:
-            raise ClientError("Missing Initrd and Kernel description")
+            raise ClientError("Invalid Initrd and Kernel description")
 
         if preseed_name is not None:
             preseed_controller = PreseedControl(self.urlhandler)
@@ -59,7 +58,7 @@ class StateControl(object):
         parameters['kernel_id'] = kernel_id
         parameters['initrd_id'] = initrd_id
         parameters['subarch'] = subarch
-        parameters['netboot_enabled'] = True
+        parameters['netboot_enabled'] = netboot
 
         data = json.dumps(parameters)
 

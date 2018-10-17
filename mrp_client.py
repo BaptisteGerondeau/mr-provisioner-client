@@ -32,7 +32,7 @@ class Client(object):
         elif self.args.subcommand == 'state':
             self.machine_control(self.args.machine, self.args.action, self.args.preseed_name,
                                  self.args.initrd_desc, self.args.kernel_desc, self.args.kernel_opts,
-                                 self.args.arch, self.args.subarch)
+                                 self.args.arch, self.args.subarch, self.args.netboot)
         else:
             self.parser.print_help()
 
@@ -75,38 +75,29 @@ class Client(object):
             exit(1)
 
     def machine_control(self, machine_name, action, preseed_name, initrd_desc, kernel_desc,
-                             kernel_opts, arch, subarch):
+                             kernel_opts, arch, subarch, netboot):
         try:
             state = StateControl(self.urlhandler, machine_name)
 
             if action == 'getparams':
-                machine_state = state.get_state()
-                print(self.__print_machine_state(machine_state))
-            else:
-                rc = state.set_state(arch, subarch, initrd_desc, kernel_desc,
-                                     kernel_opts, preseed_name)
+                machine_state = state.get_provisioning_state()
+                self._print_machine_state(machine_state)
+            elif action == 'setparams':
+                rc = state.set_provisioning_state(arch, subarch, initrd_desc, kernel_desc,
+                                     kernel_opts, preseed_name, netboot)
                 self.log.debug(rc)
-            if action == 'provision':
-                rc = state.provision()
+            elif action == 'provision':
+                rc = state.provision(arch, subarch, initrd_desc, kernel_desc,
+                                     kernel_opts, preseed_name)
                 self.log.debug(rc)
 
         except Exception as err:
             self.log.fatal(err)
             exit(1)
 
-    def __print_machine_state(self, machine_state):
-        printable_state = "id: " + str(machine_state['id']) + '\n'
-        printable_state += "name: " + machine_state['name'] + '\n'
-        printable_state += "hostname: " + machine_state['hostname'] + '\n'
-        printable_state += "arch: " + machine_state['arch'] + '\n'
-        printable_state += "subarch: " + machine_state['subarch'] + '\n'
-        printable_state += "kernel_id: " + str( machine_state['kernel_id']) + '\n'
-        printable_state += "kernel_opts: " + machine_state['kernel_opts'] + '\n'
-        printable_state += "initrd_id: " + str(machine_state['initrd_id']) + '\n'
-        printable_state += "preseed_id: " + str(machine_state['preseed_id']) + '\n'
-        printable_state += "netboot_enabled: " + str(machine_state['netboot_enabled']) + '\n'
-
-        return printable_state
+    def _print_machine_state(self, machine_state):
+        for key in machine_state.keys():
+            print("{0}: {1}".format(key, machine_state[key]))
 
 if __name__ == '__main__':
     """This is the point of entry of our application, not much logic here"""
@@ -169,9 +160,11 @@ if __name__ == '__main__':
                                 required=False, help='description of the kernel to use')
     parser_machine.add_argument('--kernel-opts', type=str, default='',
                                 help='kernel options to use')
-    parser_machine.add_argument('--arch', type=str, default='', required=True,
+    parser_machine.add_argument('--arch', type=str, default='', required=False,
                                 help='architecture of the machine as in MrP')
     parser_machine.add_argument('--subarch', type=str, default='',
                                 required=False, help='subarchitecture of the machine as in MrP')
+    parser_machine.add_argument('--netboot', action='store_true', default=False,
+                                help='Switches the netboot enabled flag on for setparams')
 
     Client(parser, parser.parse_args()).parse()
