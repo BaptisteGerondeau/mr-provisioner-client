@@ -63,3 +63,19 @@ class StateControl(object):
         data = json.dumps(parameters)
 
         return self.urlhandler.put(url, data)
+
+    def get_power_state(self):
+        url = "/api/v1/machine/{}/power".format(self.machine_id)
+        data = self.urlhandler(url)
+        return data['state']
+
+    def set_power_state(self, power_state):
+        if power_state is None:
+            raise ClientError("Please supply the desired power_state as \
+                              argument")
+        url = "/api/v1/machine/{}/power".format(self.machine_id)
+        state = dict()
+        state['state'] = power_state
+
+        data = json.dumps(state)
+        return self.urlhandler.post(url, data)

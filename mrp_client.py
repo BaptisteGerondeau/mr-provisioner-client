@@ -32,7 +32,8 @@ class Client(object):
         elif self.args.subcommand == 'state':
             self.machine_control(self.args.machine, self.args.action, self.args.preseed_name,
                                  self.args.initrd_desc, self.args.kernel_desc, self.args.kernel_opts,
-                                 self.args.arch, self.args.subarch, self.args.netboot)
+                                 self.args.arch, self.args.subarch,
+                                 self.args.netboot, self.args.power_state)
         else:
             self.parser.print_help()
 
@@ -75,7 +76,7 @@ class Client(object):
             exit(1)
 
     def machine_control(self, machine_name, action, preseed_name, initrd_desc, kernel_desc,
-                             kernel_opts, arch, subarch, netboot):
+                             kernel_opts, arch, subarch, netboot, power_state):
         try:
             state = StateControl(self.urlhandler, machine_name)
 
@@ -89,6 +90,13 @@ class Client(object):
             elif action == 'provision':
                 rc = state.provision(arch, subarch, initrd_desc, kernel_desc,
                                      kernel_opts, preseed_name)
+                self.log.debug(rc)
+            elif action == 'getpower':
+                state = state.get_power_state()
+                print(state)
+
+            elif action == 'setpower':
+                rc = state.set_power_state(power_state)
                 self.log.debug(rc)
 
         except Exception as err:
@@ -148,7 +156,8 @@ if __name__ == '__main__':
 
     parser_machine = subparsers.add_parser('state')
     parser_machine.add_argument('--action', type=str, default='', required=True,
-                                choices=['provision', 'setparams', 'getparams'],
+                                choices=['provision', 'setparams', 'getparams',
+                                          'getpower', 'setpower'],
                                 help='provision, setparams')
     parser_machine.add_argument('--machine', type=str, default='',
                                 required=True, help='name of the machine')
@@ -166,5 +175,9 @@ if __name__ == '__main__':
                                 required=False, help='subarchitecture of the machine as in MrP')
     parser_machine.add_argument('--netboot', action='store_true', default=False,
                                 help='Switches the netboot enabled flag on for setparams')
+    parser_machine.add_argument('--power-state', type=str, choices=['on', 'off', 'reboot',
+                                                                    'pxe_reboot', 'bios_reboot',
+                                                                    'disk_reboot'],
+                                default=None, help='Type of the preseed file')
 
     Client(parser, parser.parse_args()).parse()
